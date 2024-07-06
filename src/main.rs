@@ -1,14 +1,21 @@
-use axum::{Router, routing::get, routing::post, routing::put, routing::delete};
-use tokio::net::TcpListener;
-mod routing;
-use routing::{root, get_user, post_user, get_user_by_id, put_user, delete_user};
+use axum::{Router};
+use std::net::SocketAddr;
+use tokio::signal;
+use tower_http::services::ServeDir;
+
+mod routes;
 
 #[tokio::main]
+
 async fn main() {
-    let app = Router::new()
-        .route("/", get(root))
-        .route("/user", get(get_user).post(post_user))
-        .route("/user/:id", get(get_user_by_id).put(put_user).delete(delete_user));
-    let listener = TcpListener::bind("0.0.0.0:3000").await.unwrap();
-    axum::serve(listener, app).await.unwrap();
+	let room = routes::create_routes()
+		.fallback_service(tower_http::services:ServeDir::new("./static"));
+
+	let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
+	println!("the room is running on {}", addr);
+	axum::Server::bind(&addr)
+		.serve(room.into_make_service())
+		.await
+		.expect("server failed to run")
+		.unwrap();
 }
