@@ -1,5 +1,11 @@
-use rusqlite::Connection;
-
+use axum_typed_multipart::TypedMultipart;
+use chrono::prelude::*;
+use image::io::Reader;
+use password_auth::generate_hash;
+use ravif::{Encoder, Img, RGBA8};
+use rusqlite::{params, Connection};
+use std::fs;
+use std::io::Cursor;
 
 #[derive(Debug)]
 pub struct Post {
@@ -21,6 +27,7 @@ pub struct Mention {
 pub struct UserBan {
     pub ip: String,
     pub reason: Option<String>,
+}
 
 pub fn init_db() -> Result<Connection, rusqlite::Error> {
     let connection = Connection::open("lockedroom.db")?;
@@ -71,11 +78,21 @@ pub fn init_db() -> Result<Connection, rusqlite::Error> {
     Ok(connection)
 }
 
-pub fn create_user(conn: &Connection, username: &str, password: &str, level: &i64) -> Result<usize, rusqlite::Error> {
-    let password = generate_hash(password);	
+
+pub fn create_user(
+    conn: &Connection,
+    username: &str,
+    password: &str,
+    level: &i64,
+) -> Result<usize, rusqlite::Error> {
+    let password = generate_hash(password);
     conn.execute(
-		    "INSERT INTO users (username, password, level) VALUES (?1, ?2, 0)",
-		    [username, password],
-	    )?;
-    })
+        "INSERT INTO users (username, password, level) VALUES (?1, ?2, ?3)",
+        params![username, password, level],
+    )
+}
+
+
+pub fn delete_user(conn: &Connection, id: i32) -> Result<usize, rusqlite::Error> {
+	conn.execute("DELETE FROM users WHERE username = ?1", params![id])
 }
