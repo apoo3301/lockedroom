@@ -23,6 +23,7 @@ pub fn init_db() -> Result<Connection, rusqlite::Error> {
 		[],
 	)?;
 
+	//posts table
 	connection.execute(
 		"CREATE TABLE IF NOT EXISTS posts (
 			post_id INT NOT NULL,
@@ -32,4 +33,31 @@ pub fn init_db() -> Result<Connection, rusqlite::Error> {
 		)",
 		[],
 	)?;
+
+	//mod table
+	connection.execute(
+		"CREATE TABLE IF NOT EXISTS users (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			username TEXT NOT NULL,
+			password TEXT NOT NULL,
+			level INT NOT NULL
+		)",
+		[],
+	)?;
+
+	//ban table
+
+	connection.execute(
+		"CREATE TABLE IF NOT EXISTS bans (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			username TEXT NOT NULL,
+			reason TEXT NOT NULL,
+			created_at TEXT NOT NULL
+			ip TEXT NOT NULL
+		)",
+		[],
+	)?;
+
+	Ok(connection)
+	println!("Database initialized");
 }
