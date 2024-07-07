@@ -1,25 +1,51 @@
 use rusqlite::Connection;
 
+
+#[derive(Debug)]
+pub struct Post {
+    pub id: i32,
+    pub time: i64,
+    pub nick: String,
+    pub body: String,
+    pub author: String,
+    pub upload: Option<i64>,
+    pub parent: Option<i32>,
+}
+
+pub struct Mention {
+    pub post_id: i32,
+    pub target_id: i32,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct UserBan {
+    pub ip: String,
+    pub reason: Option<String>,
+
 pub fn init_db() -> Result<Connection, rusqlite::Error> {
     let connection = Connection::open("lockedroom.db")?;
     println!("connected to database.");
 
     connection.execute(
         "CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY,
-            username TEXT NOT NULL UNIQUE,
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL,
             password TEXT NOT NULL,
-            created_at TEXT NOT NULL
+            level INTEGER NOT NULL
         )",
         [],
     )?;
 
     connection.execute(
         "CREATE TABLE IF NOT EXISTS posts (
-            post_id INTEGER PRIMARY KEY,
-            target_id INTEGER NOT NULL,
-            FOREIGN KEY (post_id) REFERENCES users(id) ON DELETE CASCADE,
-            FOREIGN KEY (target_id) REFERENCES users(id) ON DELETE CASCADE
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            time INTEGER NOT NULL,
+            nick TEXT NOT NULL,
+            body TEXT NOT NULL,
+            author TEXT NOT NULL,
+            upload INTEGER,
+            parent INTEGER,
+            FOREIGN KEY (parent) REFERENCES posts(id) ON DELETE CASCADE
         )",
         [],
     )?;
@@ -36,14 +62,20 @@ pub fn init_db() -> Result<Connection, rusqlite::Error> {
 
     connection.execute(
         "CREATE TABLE IF NOT EXISTS bans (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT NOT NULL,
-            reason TEXT NOT NULL,
-            created_at TEXT NOT NULL,
-            ip TEXT NOT NULL
+            ip TEXT NOT NULL,
+            reason TEXT
         )",
         [],
     )?;
 
     Ok(connection)
+}
+
+pub fn create_user(conn: &Connection, username: &str, password: &str, level: &i64) -> Result<usize, rusqlite::Error> {
+    let password = generate_hash(password);	
+    conn.execute(
+		    "INSERT INTO users (username, password, level) VALUES (?1, ?2, 0)",
+		    [username, password],
+	    )?;
+    })
 }
