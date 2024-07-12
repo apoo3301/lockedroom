@@ -99,4 +99,18 @@ pub fn delete_user(conn: &Connection, id: i32) -> Result<usize, rusqlite::Error>
 
 pub fn get_users(conn: &Connection) -> Result<Vec<User>, rusqlite::Error> {
     let mut stmt = conn.prepare("SELECT * FROM users")?;
+    let user_iter = stmt.query_map([], |row| {
+        Ok(User {
+            id: row.get(0)?,
+            username: row.get(1)?,
+            password: row.get(2)?,
+            level: row.get(3)?,
+        })
+    })?;
+
+    let mut users = Vec::new();
+    for user in user_iter {
+        users.push(user?);
+    }
+    Ok(users)
 }
