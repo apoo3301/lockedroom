@@ -38,4 +38,10 @@ async fn main() {
         .with_session_manager(session_manager)
         .build();
     let app = Router::new();
+        .route("/", get(main_page))
+}
+
+async fn main_page(Extension(database_connection): Extension<Arc<Mutex<Connection>>>) -> impl IntoResponse {
+    let database_connection = database_connection.lock().await;
+    ResponseHTML(include_str!("../static/main.html"))
 }
