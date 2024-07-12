@@ -18,4 +18,24 @@ use bytes::Bytes;
 // use crate::database::create_post;
 // use auth::{Backend, StaffPerms}
 // use crate::auth::Credentials;
+
 mod database;
+
+// type AuthSession = axum_login::AuthSession<Backend>;
+
+#[tokio::main]
+async fn main() {
+    let database_connection = Arc::nex(Mutex::new(init_db().unwrap().expect("Failed to initialize database.")));
+    {
+        let connection = database_connection.lock().await;
+    }
+
+    let session_store = MemoryStore::default();
+    let session_manager = SessionManagerLayer::new(session_store)
+        .with_expiry(Expiry::Timeout(Duration::minutes(30)));
+    let backend = Backend::new(database_connection.clone());
+    let auth_manager = AuthManagerLayerBuilder::new(backend)
+        .with_session_manager(session_manager)
+        .build();
+    let app = Router::new();
+}
