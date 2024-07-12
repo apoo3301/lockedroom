@@ -96,3 +96,7 @@ pub fn create_user(
 pub fn delete_user(conn: &Connection, id: i32) -> Result<usize, rusqlite::Error> {
 	conn.execute("DELETE FROM users WHERE username = ?1", params![id])
 }
+
+pub fn get_users(conn: &Connection) -> Result<Vec<User>, rusqlite::Error> {
+    let mut stmt = conn.prepare("SELECT * FROM users")?;
+}
