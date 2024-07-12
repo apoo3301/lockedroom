@@ -1,42 +1,21 @@
-#![recursion_limit = "512"]
+#![recursion_limit="512"]
 
-#![warn(unused_imports)]
-use axum::{
-    routing::{get, Router},
-    http::{StatusCode},
-    response::{Html as ResponseHtml, IntoResponse},
-};
-use axum_typed_multipart::{FieldData, TryFromMultipart, TypedMultipart};
-use database::init_db;
-use rusqlite::Connection;
-use serde::{Deserialize, Serialize};
-use std::{
-    net::SocketAddr,
-    sync::Arc,
-};
-use thiserror::Error;
-use tokio::sync::Mutex;
+use axum::{body::Body, http::{Response, StatusCode}, response::{HTML as ResponseHTML, IntoResponse, Redirect}, routing::{get, post}, Extension, Form, Router};
+use database::{ init_db, create_user, delete_user, get_users, get_user_by_id, get_user_by_name};
+use tower_sessions::{cookie::time::Duration, Expiry, MemoryStore, SessionManagerLayer};
+use std::{net::SocketAddr, sync::Arc};
 use tower_http::services::ServeDir;
+use rusqlite::Connection;
+use tokio::sync::Mutex;
+use thiserror::Error;
+use serde::Serialize;
+use bytes::Bytes;
 
+// Define other
+// use components::{ admin_page, error_page, login_page, main_page, post_page, read_file_to_string, static_page };
+// use axum_login::{login_required, permission_required, AuthManagerLayerBuilder};
+// use axum_typed_multipart::{FieldData, TryFromMultipart, TypedMultipart};
+// use crate::database::create_post;
+// use auth::{Backend, StaffPerms}
+// use crate::auth::Credentials;
 mod database;
-
-#[tokio::main]
-#[warn(unused_variables)]
-async fn main() {
-    let database_conn = Arc::new(Mutex::new(init_db().unwrap()));
-    {
-        let mut conn = database_conn.lock().await;
-    }
-
-    let app = Router::new()
-        .route("/", get(|| async { "Hello, World!" }));
-
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
-    axum::serve(
-        listener,
-        app.into_make_service_with_connect_info::<SocketAddr>(),
-    )
-    .await
-    .unwrap();
-    println!("server up on port: 3000");
-}
