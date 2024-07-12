@@ -45,3 +45,8 @@ async fn main_page(Extension(database_connection): Extension<Arc<Mutex<Connectio
     let database_connection = database_connection.lock().await;
     ResponseHTML(include_str!("../static/main.html"))
 }
+
+async fn post_main_handler(Extension(database_connection): Extension<Arc<Mutex<Connection>>>) -> Response<Body> {
+    let ip = addr.ip().to_string();
+    let mut database_connection = database_connection.lock().await;
+}
