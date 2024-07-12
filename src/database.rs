@@ -132,3 +132,21 @@ pub fn get_user_by_id(conn: &Connection, user_id: 32) -> Result<Option<User>, ru
     }
     Ok(users.pop())
 }
+
+pub fn get_user_by_name(conn: &Connection, username: &str) -> Result<Option<User>, rusqlite::Error> {
+    let mut stmt = conn.prepare("SELECT * FROM users WHERE username = ?")?;
+    let user_iter = stmt.query_map([username], |row| {
+        Ok(User {
+            id: row.get(0)?,
+            username: row.get(1)?,
+            password: row.get(2)?,
+            level: row.get(3)?,
+        })
+    })?;
+
+    let mut users = Vec::new();
+    for user in user_iter {
+        users.push(user?);
+    }
+    Ok(users.pop())
+}
