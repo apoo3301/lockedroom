@@ -279,3 +279,30 @@ pub fn create_post(conn: &mut Connection, ip: &str, data: TypedMultipart<CreateP
 }
 
 #[derive(Debug)]
+enum SaveUploadError {
+    DecodeError,
+    EncodeError,
+    WriteError,
+}
+//save_upload, populate_sample_data,
+
+fn get_posts(conn: &Connection, query: String) -> Result<Vec<Post>, rusqlite::Error> {
+    let mut statement = conn.prepare(query.as_str())?;
+    let p_iter = statement.query_map([], |row| {
+        Ok(Post {
+            id: row.get(0)?,
+            time: row.get(1)?,
+            username: row.get(2)?,
+            content: row.get(3)?,
+            author: row.get(4)?,
+            upload: row.get(5)?,
+            parent: row.get(6)?,
+        })
+    })?;
+
+    let mut posts = Vec::new();
+    for post in p_iter {
+        posts.push(post?);
+    }
+    Ok(posts)
+}
