@@ -306,3 +306,19 @@ fn get_posts(conn: &Connection, query: String) -> Result<Vec<Post>, rusqlite::Er
     }
     Ok(posts)
 }
+
+pub fn get_userbans(conn: &Connection) -> Result<Vec<UserBan>, rusqlite::Error> {
+    let mut statement = conn.prepare("SELECT * FROM bans")?;
+    let p_iter = statement.query_map([], |row| {
+        Ok(UserBan {
+            ip: row.get(0)?,
+            reason: row.get(1)?,
+        })
+    })?;
+
+    let mut bans = Vec::new();
+    for ban in p_iter {
+        bans.push(ban?);
+    }
+    Ok(bans)
+}
