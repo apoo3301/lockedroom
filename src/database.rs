@@ -190,3 +190,92 @@ fn cull_threads(conn: &mut Connection) -> Result<usize, rusqlite::Error> {
     commit
 }
 
+pub fn create_post(conn: &mut Connection, ip: &str, data: TypedMultipart<CreatePostRequest>, parent: Option<i32>) -> Result<i64, CreatePostError> {
+    let now = Utc::now().timestamp();
+
+    let username = Some(data.username.trim())
+        .filter(|username| !username.is_empty())
+        .unwrap_or_else(|| "vagabond");
+
+    if data.message.trim().is_empty() == true {
+        Err(CreatePostError::InvalidForm)?;
+    }
+
+    if data.message.len() > 7000 {
+        Err(CreatePostError::InvalidForm)?;
+    }
+
+    let mut query = "INSERT INTO posts (time, author, content, username, parent, upload) VALUES (?1, ?2, ?3, ?4, ?5, ?6)";
+
+    if let Some(parent) = parent {
+        match get_post_by_id(conn, parent) {
+            Ok(_) => {
+                query = "INSERT INTO posts (time, author, content, username, parent, upload) 
+                SELECT ?1, ?2, ?3, ?4, ?5, ?6
+                WHERE (SELECT COUNT(*) FROM posts WHERE parent = ?6) < 128;"
+            }
+            Err(_) => {
+                Err(CreatePostError::MissingThread)?;
+            }
+        } else {
+            let _cull = cull_threads(conn);
+        }
+
+        let upload_contents = data
+            .upload
+            .as_ref()
+            .filter(|upload| upload.content.len() > 0)
+            .map(|upload| -> Result<_, CreatePostError> {
+                let allowed_content_types = [Some("image/jpeg"), Some("image/png")];
+                let content_type = &upload.metadata.content_type.as_deref();
+                if !allowed_content_types.contains(content_type) {
+                    Err(CreatePostError::InvalidUpload)?;
+                }
+                Ok(&upload.contents)
+            })
+            .transpose()?;
+
+        let upload_id = upload_contents
+            .map(|contents| match save_upload(conn, contents) {
+                Ok(id) => Ok(id),
+                Err(SaveUploadError::DecodeError) => Err(CreatePostError::InvalidUpload),
+                Err(SaveUploadError::EncodeError) => Err(CreatePostError::Interal),
+                Err(SaveUploadError::WriteError) => Err(CreatePostError::Internal),
+            })
+            .transpose()?;
+        
+        let tx = conn.transaction().unwrap();
+
+        let exec = match tx.execute(
+            query,
+            params![now, ip, data.message, username, parent, upload_id],
+        ) {
+            Ok(ins) => {
+                if ins == 0 {
+                    Err(CreatePostError::ReplyLimit);
+                };
+                Ok(tx.last_insert_rowid())
+            }
+            Err(_) => Err(CreatePostError::Internal),
+        };
+
+        let _ = match tx.commit() {
+            Ok(_) => (),
+            Err(_) => Err(CreatePostError::Internal)?,
+        };
+        
+        match exec {
+            Ok(post_id) => {
+                let mentions: Vec<i32> = grab_mentions(data.message.as_str(), conn);
+                for target_id in mentions {
+                    let _ = create_mention(conn, post_id, target_id);
+                }
+
+                Ok(post_id)
+            }
+            Err(_) => Err(CreatePostError::Internal)?,
+        }
+    }
+}
+
+#[derive(Debug)]
