@@ -340,3 +340,24 @@ pub fn get_users(conn: &Connection) -> Result<Vec<User>, rusqlite::Error> {
     }
     Ok(users)
 }
+
+pub fn is_banned(conn: &Connection, ip: &str) -> Result<bool, rusqlite::Error> {
+    let mut statement = conn.prepare("SELECT * FROM bans WHERE ip = ?1")?;
+    let p_iter = statement.query_map(params![ip], |row| {
+        Ok(UserBan {
+            ip: row.get(0)?,
+            reason: row.get(1)?,
+        })
+    })?;
+
+    let mut bans = Vec::new();
+    for ban in p_iter {
+        bans.push(ban?);
+    }
+
+    match bans.len() {
+        Some(_) => Ok(true),
+        None => Ok(false),
+    }
+}
+
