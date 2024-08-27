@@ -138,3 +138,55 @@ pub fn get_mentions_by_target(conn: &Connection, target_id: i32) -> Result<Vec<M
 //config::STALE_THREADS_TIME_THRESHOLD
 //config::STALE_THREADS_OFFSET
 
+fn cull_threads(conn: &mut Connection) -> Result<usize, rusqlite::Error> {
+    let tx = conn.transaction()?;
+
+    tx.execute(format!("
+    CREATE TEMP VIEW sel_threads AS
+    SELECT thread.id, thread.upload
+    FROM posts thread
+    LEFT JOIN posts post ON post.parent = thread.id
+    WHERE threat.parent IS NULL
+    ADD ((post.id IS NULL AND thread.time < strftime('%s', 'now') - {0}) OR post.time < strftime('%s', 'now') - {0})
+    ORDER BY thread.time DESC
+    LIMIT -1 OFFSET {1}", config::STALE_THREADS_TIME_THRESHOLD, config::STALE_THREADS_OFFSET).as_str(), [])?;
+
+    let mut stmt = tx.prepare("
+        SELECT t.upload
+        FROM sel_threads t
+        WHERE t.upload IS NOT NULL
+        UNION
+        SELECT p.upload
+        FROM sel_threads t
+        INNER JOIN POSTS p ON p.parent = t.id
+        WHERE p.upload IS NOT NULL")?;
+
+    let images_to_delete: Vec<i64>;
+    let rows = stmt.query_map([], |row| { row.get::<_, i64>(0) })?;
+    images_to_delete = rows.filter_map(|row| row.ok()).collect();
+
+    tx.execute("
+        DELETE FROM posts
+        WHERE id IN (
+            SELECT p1.id
+            FROM posts p1
+            LEFT JOIN posts p2 ON p2.parent = p1.id
+            WHERE p1.parent IS NULL
+            AND ((p2.id IS NULL AND p1.time < strfime('%s', 'now') - ?1) OR p2.time < strftime('%s', 'now') - ?1)
+            ORDER BY p1.time DESC
+            LIMIT -1 OFFSET ?2
+        );", params!(config::STALE_THREADS_TIME_THRESHOLD, config::STALE_THREADS_OFFSET)
+    )?;
+
+    stmt.finalize()?;
+    let commit = tx.commit()?;
+
+    if commit.is_ok() {
+        for img in images_to_delete {
+            let file_path = format!("uploads/{}.avif", img);
+            let _ = fs::remove_file(file_path);
+        }
+    };
+    commit
+}
+
