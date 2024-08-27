@@ -361,3 +361,40 @@ pub fn is_banned(conn: &Connection, ip: &str) -> Result<bool, rusqlite::Error> {
     }
 }
 
+pub fn get_user_by_id(conn: &Connection, user_id: i32) -> Result<Option<User>, rusqlite::Error> {
+    let mut statement = conn.prepare("SELECT * FROM users WHERE id = ?1")?;
+    let p_iter = statement.query_map(params![user_id], |row| {
+        Ok(User {
+            id: row.get(0)?,
+            username: row.get(1)?,
+            password: row.get(2)?,
+            level: row.get(3)?,
+        })
+    })?;
+
+    let mut users = Vec::new();
+    for user in p_iter {
+        users.push(user?);
+    }
+
+    Ok(users.pop())
+}
+
+pub fn get_user_by_username(conn: &Connection, username: &str) -> Result<Option<User>, rusqlite::Error> {
+    let mut statement = conn.prepare("SELECT * FROM users WHERE username = ?1")?;
+    let p_iter = statement.query_map(params![username], |row| {
+        Ok(User {
+            id: row.get(0)?,
+            username: row.get(1)?,
+            password: row.get(2)?,
+            level: row.get(3)?,
+        })
+    })?;
+
+    let mut users = Vec::new();
+    for user in p_iter {
+        users.push(user?);
+    }
+
+    Ok(users.pop())
+}
