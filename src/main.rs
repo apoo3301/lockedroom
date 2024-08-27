@@ -29,3 +29,10 @@ async fn main() {
             .await
             .unwrap();
 }
+
+async create_directory_if_not_exists(path: &str) -> io::Result<()> {
+    if !fs::metadata(path).await.is_ok() {
+        fs::create_dir_all(path)?;
+    }
+    Ok(())
+}
