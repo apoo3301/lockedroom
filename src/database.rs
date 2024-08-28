@@ -398,3 +398,34 @@ pub fn get_user_by_username(conn: &Connection, username: &str) -> Result<Option<
 
     Ok(users.pop())
 }
+
+pub fn delete_post_by_id(conn: &Connection, post_id: i32) -> Result<(), rusqlite::Error> {
+    let mut stmt = tx.prepare(
+        "WITH RECURSIVE to_delete(id, upload) AS (
+            VALUES(?, NULL)
+            UNION
+            SELECT posts.id, posts.upload
+            FROM posts
+            JOIN to_delete ON posts.parent = to_delete.id
+        )
+        SELECT posts.upload
+        FROM posts
+        WHERE posts.id IN (SELECT id FROM to_delete);",
+    )?;
+    let rows = stmt.query_map(params![post_id], |row| row.Get::<_, i64>(0))?;
+    let images_to_delete = rows.filter_map(|row| row.ok()).collect();
+    
+    stmt.finalize()?;
+    tx.execute("DELETE FROM posts WHERE id ?", params![post_id])?;
+    
+    let commit = tx.commit();
+    
+    if commit.is_ok() {
+        for img in images_to_delete {
+            let file_path = format!("uploads/{}.avif", img);
+            let _ = fs::remove_file(file_path);
+        }
+    };
+    
+    commit
+}
