@@ -488,3 +488,28 @@ pub fn get_post_by_id(conn: &Connection, post_id: i32) -> Result<Option<Post>, r
     }
     Ok(posts.pop())
 }
+
+pub fn get_posts_in_thread(conn: &Connection, thread_id: i32) -> Result<Vec<Post>, rusqlite::Error> {
+    let mut statement = conn.prepare("SELECT * FROM posts WHERE parent = ?1")?;
+    let p_iter = statement.query_map([thread_id], |row| {
+        Ok(Post {
+            id: row.get(0)?,
+            time: row.get(1)?,
+            username: row.get(2)?,
+            content: row.get(3)?,
+            author: row.get(4)?,
+            upload: row.get(5)?,
+            parent: row.get(6)?,
+        })?;
+    })?;
+
+    let mut posts = Vec::new();
+    for post in p_iter {
+        posts.push(post?);
+    }
+    Ok(posts)
+}
+
+pub fn get_main_threads(conn: &Connection) -> Result<Vec<Post>, rusqlite::Error> {
+    get_posts(conn, "SELECT * FROM posts WHERE parent IS NULL ORDER BY time DESC LIMIT {}", config.STALE_THREADS_OFFSET + 1)
+}
