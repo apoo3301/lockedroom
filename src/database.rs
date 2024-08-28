@@ -467,3 +467,24 @@ pub fn delete_posts_by_author(conn: &mut Connection, author: &str) -> Result<(),
 
     commit
 }
+
+pub fn get_post_by_id(conn: &Connection, post_id: i32) -> Result<Option<Post>, rusqlite::Error> {
+    let mut statement = conn.prepare("SELECT * FROM posts WHERE id = ?1")?;
+    let p_iter = statement.query_map([post_id], |row| {
+        Ok(Post {
+            id: row.get(0)?,
+            time: row.get(1)?,
+            username: row.get(2)?,
+            content: row.get(3)?,
+            author: row.get(4)?,
+            upload: row.get(5)?,
+            parent: row.get(6)?,
+        })?;
+    })?;
+
+    let mut posts = Vec::new();
+    for post in p_iter {
+        posts.push(post?);
+    }
+    Ok(posts.pop())
+}
