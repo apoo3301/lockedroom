@@ -429,3 +429,41 @@ pub fn delete_post_by_id(conn: &Connection, post_id: i32) -> Result<(), rusqlite
     
     commit
 }
+
+pub fn delete_posts_by_author(conn: &mut Connection, author: &str) -> Result<(), rusqlite::Error> {
+    let tx = conn.transaction()?;
+    let images_to_delete: Vec<i64>;
+
+    let mut stmt = tx.prepare(
+        "
+        WITH RECURSIVE to_delete(id, upload) AS (
+            SELECT id, upload
+            FROM posts
+            WHERE author = ?
+            UNION
+            SELECT posts.id, posts.upload
+            FROM posts
+            JOIN to_delete ON posts.parent = to_delete.id
+        )
+        SELECT posts.upload
+        FROM posts
+        WHERE posts.id IN (SELECT id FROM to_delete);",
+    )?;
+    let rows = stmt.query_map(params![author], |row| row.get::<_, i64>(0))?;
+    images_to_delete = rows.filter_map(|row| row.ok()).collect();
+
+    stmt.finalize()?;
+
+    tx.execute("DELETE FROM posts WHERE author = ?", params![author])?;
+
+    let commit = tx.commit()?;
+
+    if commit.is_ok() {
+        for img in images_to_delete {
+            let file_path = format!("uploads/{}.avif", img);
+            let _ = fs::remove_file(file_path);
+        }
+    };
+
+    commit
+}
